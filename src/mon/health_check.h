@@ -5,6 +5,8 @@
 
 #include <string>
 #include <map>
+#include <list>
+#include <chrono>
 
 #include "include/health.h"
 #include "include/utime.h"
@@ -27,19 +29,17 @@ struct health_check_t {
     DENC_FINISH(p);
   }
 
-  friend bool operator==(const health_check_t& l,
-			 const health_check_t& r) {
+  friend bool operator==(const health_check_t& l, const health_check_t& r) {
     return l.severity == r.severity &&
-      l.summary == r.summary &&
-      l.detail == r.detail &&
-      l.count == r.count;
+           l.summary == r.summary &&
+           l.detail == r.detail &&
+           l.count == r.count;
   }
-  friend bool operator!=(const health_check_t& l,
-			 const health_check_t& r) {
+  friend bool operator!=(const health_check_t& l, const health_check_t& r) {
     return !(l == r);
   }
 
-  void dump(ceph::Formatter *f, bool want_detail=true) const {
+  void dump(ceph::Formatter *f, bool want_detail = true) const {
     f->dump_stream("severity") << severity;
 
     f->open_object_section("summary");
@@ -50,9 +50,9 @@ struct health_check_t {
     if (want_detail) {
       f->open_array_section("detail");
       for (auto& p : detail) {
-	f->open_object_section("detail_item");
-	f->dump_string("message", p);
-	f->close_section();
+        f->open_object_section("detail_item");
+        f->dump_string("message", p);
+        f->close_section();
       }
       f->close_section();
     }
@@ -70,48 +70,8 @@ struct health_check_t {
 };
 WRITE_CLASS_DENC(health_check_t)
 
-
-struct health_mute_t {
-  std::string code;
-  utime_t ttl;
-  bool sticky = false;
-  std::string summary;
-  int64_t count;
-
-  DENC(health_mute_t, v, p) {
-    DENC_START(1, 1, p);
-    denc(v.code, p);
-    denc(v.ttl, p);
-    denc(v.sticky, p);
-    denc(v.summary, p);
-    denc(v.count, p);
-    DENC_FINISH(p);
-  }
-
-  void dump(ceph::Formatter *f) const {
-    f->dump_string("code", code);
-    if (ttl != utime_t()) {
-      f->dump_stream("ttl") << ttl;
-    }
-    f->dump_bool("sticky", sticky);
-    f->dump_string("summary", summary);
-    f->dump_int("count", count);
-  }
-
-  static void generate_test_instances(std::list<health_mute_t*>& ls) {
-    ls.push_back(new health_mute_t);
-    ls.push_back(new health_mute_t);
-    ls.back()->code = "OSD_DOWN";
-    ls.back()->ttl = utime_t(1, 2);
-    ls.back()->sticky = true;
-    ls.back()->summary = "foo bar";
-    ls.back()->count = 2;
-  }
-};
-WRITE_CLASS_DENC(health_mute_t)
-
 struct health_check_map_t {
-  std::map<std::string,health_check_t> checks;
+  std::map<std::string, health_check_t> checks;
 
   DENC(health_check_map_t, v, p) {
     DENC_START(1, 1, p);
@@ -152,9 +112,9 @@ struct health_check_map_t {
   }
 
   health_check_t& add(const std::string& code,
-		      health_status_t severity,
-		      const std::string& summary,
-		      int64_t count) {
+                      health_status_t severity,
+                      const std::string& summary,
+                      int64_t count) {
     ceph_assert(checks.count(code) == 0);
     health_check_t& r = checks[code];
     r.severity = severity;
@@ -162,10 +122,11 @@ struct health_check_map_t {
     r.count = count;
     return r;
   }
+
   health_check_t& get_or_add(const std::string& code,
-			     health_status_t severity,
-			     const std::string& summary,
-			     int64_t count) {
+                             health_status_t severity,
+                             const std::string& summary,
+                             int64_t count) {
     health_check_t& r = checks[code];
     r.severity = severity;
     r.summary = summary;
@@ -187,13 +148,31 @@ struct health_check_map_t {
     }
   }
 
+  void update_pg_availability_check(
+    const std::map<std::string, utime_t>& pg_states,
+    const std::chrono::seconds& timeout) {
+    auto now = ceph_clock_now(); // Fetch current time
+    for (const auto& [pg_id, last_change_time] : pg_states) {
+      auto duration = now - last_change_time;
+      if (duration > timeout) {
+        auto& check = get_or_add("PG_AVAILABILITY",
+                                 HEALTH_WARN,
+                                 "Reduced data availability: PG stuck peering",
+                                 1);
+        check.detail.push_back("PG " + pg_id + " stuck peering for " +
+                               std::to_string(duration.to_seconds()) + " seconds.");
+      }
+    }
+  }
+
   friend bool operator==(const health_check_map_t& l,
-			 const health_check_map_t& r) {
+                         const health_check_map_t& r) {
     return l.checks == r.checks;
   }
   friend bool operator!=(const health_check_map_t& l,
-			 const health_check_map_t& r) {
+                         const health_check_map_t& r) {
     return !(l == r);
   }
 };
 WRITE_CLASS_DENC(health_check_map_t)
+
