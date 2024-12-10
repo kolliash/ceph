@@ -139,6 +139,19 @@ void HealthMonitor::create_pending()
   pending_mutes = mutes;
 }
 
+
+//added function void HealthMonitor::log_stuck_pg(const std::map<std::string, utime_t> &pg_states, const std::chrono::seconds &timeout) {
+    auto now = ceph_clock_now(); // Fetch the current time
+    for (const auto &[pg_id, last_change_time] : pg_states) {
+        auto duration = now - last_change_time;
+        if (duration > timeout) {
+            dout(1) << "WARNING: PG " << pg_id << " has been stuck in peering for "
+                    << duration.to_seconds() << " seconds." << dendl;
+        }
+    }
+}
+
+
 void HealthMonitor::encode_pending(MonitorDBStore::TransactionRef t)
 {
   ++version;
