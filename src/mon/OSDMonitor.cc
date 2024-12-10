@@ -191,6 +191,26 @@ struct OSDMemCache : public PriorityCache::PriCache {
     }
     return total;
   }
+void OSDMonitor::handle_stuck_pg(const PGMap& pg_map) {
+    const auto timeout_threshold = std::chrono::seconds(60);
+
+    // Iterate through all PGs in the PGMap
+    for (const auto& pg : pg_map.get_pg_states()) {
+        // Check peering state
+        if (pg.second.state == PG_STATE_PEERING) {
+            auto now = std::chrono::system_clock::now();
+            auto time_in_peering = now - pg.second.last_state_change;
+
+            // Log timeout threshold
+            if (time_in_peering > timeout_threshold) {
+                dout(1) << "PG " << pg.first << " has been stuck in peering for "
+                        << std::chrono::duration_cast<std::chrono::seconds>(time_in_peering).count()
+                        << " seconds. Investigating..." << dendl;
+            }
+        }
+    }
+}
+
 
   virtual void set_cache_bytes(PriorityCache::Priority pri, int64_t bytes) {
     cache_bytes[pri] = bytes;
