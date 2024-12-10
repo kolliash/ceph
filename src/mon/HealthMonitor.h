@@ -58,8 +58,11 @@ public:
   /**
    * @} // HealthMonitor_Inherited_h
    */
-//Added function
+//Added functions
   void log_stuck_pg(const std::map<std::string, utime_t> &pg_states, const std::chrono::seconds &timeout);
+  
+  void count_peering_pgs(const std::map<std::string, utime_t>& pg_states);
+
 
 private:
   bool preprocess_command(MonOpRequestRef op);

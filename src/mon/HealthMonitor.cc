@@ -140,7 +140,8 @@ void HealthMonitor::create_pending()
 }
 
 
-//added function void HealthMonitor::log_stuck_pg(const std::map<std::string, utime_t> &pg_states, const std::chrono::seconds &timeout) {
+//added functions
+ void HealthMonitor::log_stuck_pg(const std::map<std::string, utime_t> &pg_states, const std::chrono::seconds &timeout) {
     auto now = ceph_clock_now(); // Fetch the current time
     for (const auto &[pg_id, last_change_time] : pg_states) {
         auto duration = now - last_change_time;
@@ -149,6 +150,11 @@ void HealthMonitor::create_pending()
                     << duration.to_seconds() << " seconds." << dendl;
         }
     }
+}
+
+void HealthMonitor::count_peering_pgs(const std::map<std::string, utime_t>& pg_states) {
+    int peering_count = pg_states.size(); // Assuming pg_states contains only 'peering' PGs
+    dout(1) << "INFO: Total number of PGs in peering state: " << peering_count << dendl;
 }
 
 
