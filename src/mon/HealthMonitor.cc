@@ -132,6 +132,23 @@ void HealthMonitor::update_from_paxos(bool *need_bootstrap)
   jf.flush(*_dout);
   *_dout << dendl;
 }
+//added functions
+void track_pg_state_changes(const std::map<std::string, utime_t>& pg_states, const std::set<std::string>& previous_peering_pgs) {
+    for (const auto& [pg_id, _] : pg_states) {
+        if (previous_peering_pgs.find(pg_id) == previous_peering_pgs.end()) {
+            dout(1) << "INFO: PG " << pg_id << " has entered the peering state." << dendl;
+        }
+    }
+}
+
+
+void summarize_peering_pgs(const std::map<std::string, utime_t>& pg_states, int threshold) {
+    if (pg_states.size() > threshold) {
+        dout(1) << "WARNING: " << pg_states.size() << " PGs are in peering state, exceeding the threshold of " << threshold << dendl;
+    }
+}
+
+
 
 void HealthMonitor::create_pending()
 {
